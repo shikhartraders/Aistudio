@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>AI Studio | Elite Monolith</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark-reasonable.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+/* ================= VARIABLES ================= */
+:root {
+  --bg-deep: #000000;
+  --bg-panel: #0a0a0a;
+  --gold-primary: #D4AF37;
+  --gold-dim: #8E7108;
+  --gold-grad: linear-gradient(135deg, #D4AF37, #F4D03F, #8E7108);
+  --text-main: #ffffff;
+  --whiteboard: #fdfbf7;
+  --font-disp: 'Cinzel', serif;
+  --font-body: 'Inter', sans-serif;
+  --font-code: 'JetBrains Mono', monospace;
+  --font-hand: 'Kalam', cursive;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; outline:none; -webkit-tap-highlight-color:transparent; }
+
+body {
+  background: var(--bg-deep); color: var(--text-main); font-family: var(--font-body);
+  height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* ================= SPLASH SCREEN ================= */
+#splash {
+  position: fixed; inset: 0; background: #000; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: opacity 0.8s ease;
+}
+.splash-logo {
+  font-family: var(--font-disp); font-size: 3rem; color: transparent;
+  background: var(--gold-grad); -webkit-background-clip: text; background-clip: text;
+  animation: blurFocus 2s ease forwards; text-align: center;
+}
+.splash-sub { color: #555; letter-spacing: 4px; font-size: 0.8rem; margin-top: 10px; opacity: 0; animation: fadeIn 1s 1s forwards; }
+@keyframes blurFocus { 0% { filter: blur(20px); opacity: 0; transform: scale(0.9); } 100% { filter: blur(0); opacity: 1; transform: scale(1); } }
+@keyframes fadeIn { to { opacity: 1; } }
+
+/* ================= APP STRUCTURE ================= */
+#app { opacity: 0; transition: opacity 1s; display: flex; flex-direction: column; height: 100%; visibility: hidden; }
+
+/* Header */
+header {
+  height: 65px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
+  background: rgba(10,10,10,0.85); backdrop-filter: blur(10px); border-bottom: 1px solid #222; z-index: 100;
+}
+.brand { font-family: var(--font-disp); color: var(--gold-primary); font-size: 1.4rem; font-weight: 700; }
+.header-right { display: flex; align-items: center; gap: 15px; }
+.avatar-btn {
+  width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--gold-primary);
+  object-fit: cover; cursor: pointer; transition: transform 0.2s;
+}
+.avatar-btn:active { transform: scale(0.9); }
+
+/* Chat Area */
+#chat-viewport {
+  flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; scroll-behavior: smooth;
+}
+
+/* Messages */
+.msg-row { display: flex; width: 100%; animation: slideUp 0.3s ease; }
+@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.msg-row.user { justify-content: flex-end; }
+.msg-row.ai { justify-content: flex-start; }
+
+.bubble {
+  max-width: 88%; padding: 14px 18px; font-size: 0.95rem; line-height: 1.6; border-radius: 18px; position: relative;
+}
+.user .bubble {
+  background: var(--gold-grad); color: #050505; border-radius: 18px 18px 2px 18px; font-weight: 600;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
+}
+.ai .bubble {
+  background: #111; border: 1px solid #333; color: #eee; border-radius: 18px 18px 18px 2px;
+}
+.ai .bubble.whiteboard {
+  background: var(--whiteboard); color: #2c3e50; font-family: var(--font-hand); font-weight: 700;
+  font-size: 1.1rem; border: 4px solid #333; box-shadow: 5px 5px 0 #111;
+}
+
+/* Bubble Actions */
+.msg-tools { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; opacity: 0.6; }
+.tool-btn { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.85rem; }
+.tool-btn:hover { color: var(--gold-primary); transform: scale(1.1); }
+
+.chat-img { max-width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid #444; }
+
+/* Controls */
+#controls {
+  background: #020202; border-top: 1px solid #222; padding: 15px 15px 30px 15px; z-index: 50;
+}
+.mode-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 12px; }
+.mode-pill {
+  background: transparent; border: 1px solid #333; color: #666; padding: 6px 16px; border-radius: 20px;
+  font-size: 0.7rem; font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.3s;
+}
+.mode-pill.active { border-color: var(--gold-primary); color: var(--gold-primary); background: rgba(212,175,55,0.08); }
+
+.input-zone {
+  display: flex; align-items: center; gap: 10px; background: #111; border: 1px solid #333;
+  padding: 8px 8px 8px 15px; border-radius: 12px; transition: border 0.3s;
+}
+.input-zone:focus-within { border-color: var(--gold-dim); }
+#msg-input { flex: 1; background: transparent; border: none; color: #fff; font-size: 1rem; padding: 5px 0; }
+.icon-action { width: 35px; height: 35px; border: none; background: none; color: #888; font-size: 1.2rem; cursor: pointer; }
+.send-action { width: 42px; height: 42px; background: var(--gold-primary); border: none; border-radius: 8px; color: #000; font-size: 1.2rem; cursor: pointer; }
+
+/* ================= SETTINGS HUB ================= */
+.hub-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 10000;
+  display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;
+}
+.hub-overlay.open { display: flex; opacity: 1; }
+.hub-card {
+  width: 90%; max-width: 400px; background: #0a0a0a; border: 1px solid #333;
+  border-radius: 16px; overflow: hidden; max-height: 85vh; display: flex; flex-direction: column;
+}
+.hub-header {
+  background: linear-gradient(to bottom, #111, #050505); padding: 25px; text-align: center; border-bottom: 1px solid #222;
+}
+.hub-avatar-large {
+  width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--gold-primary);
+  margin-bottom: 15px; object-fit: cover;
+}
+.hub-body { padding: 20px; overflow-y: auto; flex: 1; }
+.hub-section { margin-bottom: 25px; }
+.hub-label { color: var(--gold-primary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: block; }
+.hub-input {
+  width: 100%; background: #151515; border: 1px solid #333; color: #fff; padding: 12px;
+  border-radius: 8px; margin-bottom: 10px; font-family: var(--font-body);
+}
+.save-btn { width: 100%; background: var(--gold-primary); color: #000; padding: 14px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.close-btn { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; }
+
+/* Saved Items */
+.vault-item {
+  background: #111; border: 1px solid #222; padding: 12px; border-radius: 8px;
+  margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between;
+}
+.vault-item:hover { border-color: var(--gold-primary); }
+
+#camera-input, #avatar-upload { display: none; }
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-logo">AI STUDIO</div>
+  <div class="splash-sub">ELITE MONOLITH V4.0</div>
+</div>
+
+<div id="app">
+  
+  <header>
+    <div class="brand">AI STUDIO</div>
+    <div class="header-right">
+      <img src="" id="header-avatar" class="avatar-btn" onclick="openHub()">
+    </div>
+  </header>
+
+  <div id="chat-viewport">
+    <div class="msg-row ai">
+      <div class="bubble">
+        <strong>System Initialization Complete.</strong><br>
+        Welcome back to the Elite Engine. All modules (Vision, Voice, Code, Whiteboard) are active.
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div class="mode-bar">
+      <button class="mode-pill active" onclick="setMode('chat', this)">NEURAL</button>
+      <button class="mode-pill" onclick="setMode('code', this)">CODE</button>
+      <button class="mode-pill" onclick="setMode('flux', this)">FLUX</button>
+    </div>
+
+    <div class="input-zone">
+      <button class="icon-action" onclick="document.getElementById('camera-input').click()">
+        <i class="fa-solid fa-camera"></i>
+      </button>
+      <input type="file" id="camera-input" accept="image/*" capture="environment" onchange="handleImage(this)">
+      
+      <input type="text" id="msg-input" placeholder="Enter command..." autocomplete="off">
+      
+      <button class="send-action" onclick="sendMsg()">
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+    
+    <div style="text-align:center; color:#444; font-size:0.6rem; letter-spacing:2px; margin-top:15px; font-family:var(--font-disp);">
+      BY SHIKHAR PANDEY ELITE ENGINE
+    </div>
+  </div>
+
+</div>
+
+<div id="hub-modal" class="hub-overlay">
+  <div class="hub-card">
+    <button class="close-btn" onclick="closeHub()">&times;</button>
+    
+    <div class="hub-header">
+      <img src="" id="hub-avatar" class="hub-avatar-large" onclick="document.getElementById('avatar-upload').click()">
+      <input type="file" id="avatar-upload" accept="image/*" onchange="previewAvatar(this)">
+      <h3 id="hub-name" style="color:#fff; margin:10px 0 5px 0;">User Name</h3>
+      <div id="hub-title" style="color:#666; font-size:0.8rem; text-transform:uppercase;">Title</div>
+    </div>
+
+    <div class="hub-body">
+      <div class="hub-section">
+        <span class="hub-label">Profile Configuration</span>
+        <input type="text" id="prof-name" class="hub-input" placeholder="Display Name">
+        <input type="text" id="prof-title" class="hub-input" placeholder="Job Title / Role">
+      </div>
+
+      <div class="hub-section">
+        <span class="hub-label">System Access</span>
+        <input type="password" id="prof-key" class="hub-input" placeholder="OpenRouter / OpenAI API Key">
+      </div>
+
+      <div class="hub-section">
+        <span class="hub-label">Student Vault (Saved Solutions)</span>
+        <div id="vault-list"></div>
+      </div>
+
+      <button class="save-btn" onclick="saveProfile()">SAVE SYSTEM STATE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- CONFIGURATION ---
+const DEFAULT_AVATAR = "https://ui-avatars.com/api/?name=SP&background=D4AF37&color=000&size=128";
+
+// --- STATE MANAGEMENT ---
+let user = {
+  name: "Shikhar Traders",
+  title: "Elite Administrator",
+  avatar: DEFAULT_AVATAR,
+  apiKey: ""
+};
+let currentMode = "chat";
+let pendingImg = null;
+let savedSolutions = [];
+
+// --- INITIALIZATION ---
+window.onload = function() {
+  loadSystem();
+  
+  // Failsafe: Force open if splash hangs
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    if(splash.style.display !== 'none') initApp();
+  }, 3500);
+
+  // Bind Enter Key
+  document.getElementById('msg-input').addEventListener("keypress", (e) => {
+    if(e.key === "Enter") sendMsg();
+  });
+  
+  // Init Syntax Highlighting
+  if(window.hljs) hljs.highlightAll();
+};
+
+function initApp() {
+  const splash = document.getElementById('splash');
+  const app = document.getElementById('app');
+  splash.style.opacity = '0';
+  setTimeout(() => {
+    splash.style.display = 'none';
+    app.style.visibility = 'visible';
+    app.style.opacity = '1';
+  }, 800);
+}
+
+function loadSystem() {
+  // Load Profile
+  const savedUser = localStorage.getItem("elite_user_v4");
+  if(savedUser) user = JSON.parse(savedUser);
+  
+  // Load Vault
+  const savedVault = localStorage.getItem("elite_vault_v4");
+  if(savedVault) savedSolutions = JSON.parse(savedVault);
+
+  updateUI();
+  
+  if(!user.apiKey) setTimeout(openHub, 1500);
+  
+  // Start App
+  initApp();
+}
+
+function updateUI() {
+  // Main
+  document.getElementById('header-avatar').src = user.avatar;
+  
+  // Hub
+  document.getElementById('hub-avatar').src = user.avatar;
+  document.getElementById('hub-name').innerText = user.name;
+  document.getElementById('hub-title').innerText = user.title;
+  document.getElementById('prof-name').value = user.name;
+  document.getElementById('prof-title').value = user.title;
+  document.getElementById('prof-key').value = user.apiKey;
+  
+  renderVault();
+}
+
+// --- PROFILE ACTIONS ---
+function openHub() { document.getElementById('hub-modal').classList.add('open'); }
+function closeHub() { document.getElementById('hub-modal').classList.remove('open'); }
+
+function previewAvatar(input) {
+  if(input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => document.getElementById('hub-avatar').src = e.target.result;
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function saveProfile() {
+  user.name = document.getElementById('prof-name').value;
+  user.title = document.getElementById('prof-title').value;
+  user.apiKey = document.getElementById('prof-key').value;
+  user.avatar = document.getElementById('hub-avatar').src;
+  
+  localStorage.setItem("elite_user_v4", JSON.stringify(user));
+  updateUI();
+  closeHub();
+  addBubble("ai", `System Profile Updated. User: ${user.name}`);
+}
+
+// --- VAULT (SAVED SOLUTIONS) ---
+function saveToVault(text) {
+  const preview = text.substring(0, 40) + "...";
+  savedSolutions.unshift({ id: Date.now(), preview, text });
+  localStorage.setItem("elite_vault_v4", JSON.stringify(savedSolutions));
+  alert("Solution Saved to Vault");
+  renderVault();
+}
+
+function renderVault() {
+  const list = document.getElementById('vault-list');
+  list.innerHTML = "";
+  if(savedSolutions.length === 0) {
+    list.innerHTML = "<div style='color:#555; font-size:0.8rem; font-style:italic;'>Vault Empty</div>";
+    return;
+  }
+  savedSolutions.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'vault-item';
+    el.innerHTML = `<span style="color:#ccc; font-size:0.8rem;">${item.preview}</span> <i class="fa-solid fa-chevron-right" style="color:#666; font-size:0.8rem;"></i>`;
+    el.onclick = () => {
+      closeHub();
+      addBubble("ai", item.text, null, true); // Reload as whiteboard just in case
+    };
+    list.appendChild(el);
+  });
+}
+
+// --- CORE CHAT LOGIC ---
+function setMode(mode, btn) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const ph = { chat: "Enter command...", code: "Describe logic...", flux: "Enter prompt..." };
+  document.getElementById('msg-input').placeholder = ph[mode];
+}
+
+function handleImage(input) {
+  if(input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      pendingImg = e.target.result;
+      addBubble("user", "Image Scanned", pendingImg);
+      document.getElementById('msg-input').value = "Analyze this.";
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+async function sendMsg() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  
+  // PDF Trigger
+  if(text.toLowerCase().includes("pdf") && text.toLowerCase().includes("chat")) {
+    genPDF(); input.value = ""; return;
+  }
+
+  if(!text && !pendingImg) return;
+  if(!user.apiKey) { openHub(); return; }
+
+  // 1. Add User Msg
+  if(!pendingImg) addBubble("user", text);
+  input.value = "";
+  
+  // 2. Loading State
+  const loadId = "load-" + Date.now();
+  addBubble("ai", `<i class="fa-solid fa-circle-notch fa-spin"></i> Processing Neural Request...`, null, false, loadId);
+
+  // 3. Prompt Construction
+  const sysPrompts = {
+    chat: "You are an Elite AI Tutor. If explaining Math/Physics, start response with [WHITEBOARD].",
+    code: "You are an Expert Coder. Wrap all code in markdown.",
+    flux: "You are a Visual Engine. Describe the scene in extreme detail."
+  };
+  
+  let messages = [{ role: "system", content: sysPrompts[currentMode] }];
+  
+  if(pendingImg) {
+    messages.push({ role: "user", content: [{ type: "text", text: text || "Analyze" }, { type: "image_url", image_url: { url: pendingImg } }]});
+    pendingImg = null;
+  } else {
+    messages.push({ role: "user", content: text });
+  }
+
+  // 4. API Call
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${user.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai/gpt-4o-mini", messages: messages })
+    });
+
+    if(!res.ok) throw new Error("API Connection Failed");
+    
+    const data = await res.json();
+    let reply = data.choices[0].message.content;
+    
+    // Remove Loader
+    const loader = document.getElementById(loadId);
+    if(loader) loader.parentElement.remove();
+
+    // Check Whiteboard
+    let isWB = false;
+    if(reply.includes("[WHITEBOARD]")) {
+      isWB = true;
+      reply = reply.replace("[WHITEBOARD]", "");
+    }
+    
+    addBubble("ai", reply, null, isWB);
+
+  } catch(err) {
+    const loader = document.getElementById(loadId);
+    if(loader) loader.innerHTML = `<span style="color:red">Error: ${err.message}</span>`;
+  }
+}
+
+// --- BUBBLE RENDERER ---
+function addBubble(role, html, img, isWB, customId) {
+  const box = document.getElementById('chat-viewport');
+  const row = document.createElement('div');
+  row.className = `msg-row ${role}`;
+  
+  const b = document.createElement('div');
+  b.className = `bubble ${isWB ? 'whiteboard' : ''}`;
+  if(customId) b.id = customId;
+  
+  let content = "";
+  if(img) content += `<img src="${img}" class="chat-img"><br>`;
+  
+  if(window.marked && role === 'ai') content += marked.parse(html);
+  else content += html;
+  
+  b.innerHTML = content;
+
+  // Add Tools (Voice, Copy, Save)
+  if(role === 'ai' && !customId) {
+    const tools = document.createElement('div');
+    tools.className = 'msg-tools';
+    
+    // Speak
+    const btnSpeak = document.createElement('button');
+    btnSpeak.className = 'tool-btn';
+    btnSpeak.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+    btnSpeak.onclick = () => speak(html.replace(/[*#`]/g, ''));
+    tools.appendChild(btnSpeak);
+    
+    // Copy
+    const btnCopy = document.createElement('button');
+    btnCopy.className = 'tool-btn';
+    btnCopy.innerHTML = '<i class="fa-regular fa-copy"></i>';
+    btnCopy.onclick = () => { navigator.clipboard.writeText(html); alert("Copied"); };
+    tools.appendChild(btnCopy);
+
+    // Save
+    const btnSave = document.createElement('button');
+    btnSave.className = 'tool-btn';
+    btnSave.innerHTML = '<i class="fa-regular fa-bookmark"></i>';
+    btnSave.onclick = () => saveToVault(html);
+    tools.appendChild(btnSave);
+
+    b.appendChild(tools);
+    
+    if(window.hljs) b.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+  }
+  
+  row.appendChild(b);
+  box.appendChild(row);
+  box.scrollTop = box.scrollHeight;
+}
+
+// --- UTILS ---
+function speak(txt) {
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(txt.substring(0, 300)); // Limit for stability
+  window.speechSynthesis.speak(u);
+}
+
+function genPDF() {
+  if(!window.jspdf) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFont("courier");
+  doc.text(`ELITE ENGINE TRANSCRIPT - ${user.name}`, 10, 10);
+  let y = 20;
+  
+  document.querySelectorAll('.bubble').forEach(b => {
+    const raw = b.innerText.replace("🔊", "").replace("Copy", "");
+    const lines = doc.splitTextToSize(raw, 180);
+    doc.text(lines, 10, y);
+    y += (lines.length * 5) + 10;
+    if(y > 270) { doc.addPage(); y = 10; }
+  });
+  doc.save("Session_Log.pdf");
+}
+
+</script>
+</body>
+  </html>
